@@ -67,12 +67,19 @@ class Graph:
 	def __init__(self, x_dim: float, y_dim: float):
 		self.x_dim = x_dim
 		self.y_dim = y_dim
+		self.time = 0
 
 		self.healthy = []
 		self.infected = []
 		self.ill = []
 		self.convalescent = []
 		self.dead = []
+
+		self.healthy_accumulation = []
+		self.infected_accumulation = []
+		self.ill_accumulation = []
+		self.convalescent_accumulation = []
+		self.dead_accumulation = []
 
 		self.color_dict = {
 			"healthy": [0.2, 0.9, 0.4],
@@ -122,15 +129,39 @@ class Graph:
 				temp = plt.scatter(person.x, person.y, c=[color], s=7)
 				self.dead.append(temp)
 
-		# Pie
+		# Chart
+		self.time += 1
+		self.healthy_accumulation.append(len(self.healthy))
+		self.infected_accumulation.append(len(self.infected))
+		self.ill_accumulation.append(len(self.ill))
+		self.convalescent_accumulation.append(len(self.convalescent))
+		self.dead_accumulation.append(len(self.dead))
+
 		plt.subplot(1, 2, 2)
 		plt.cla()
-		plt.pie((len(self.healthy), len(self.infected), len(self.ill),
-					len(self.convalescent), len(self.dead)),
-					# TODO: czy dokumentacja gwarantuje kolejnosc wartosci?
-					colors=self.color_dict.values(),
-					labels=self.color_dict.keys(),
-				)
+		plt.title("Udział poszczególnych grup w populacji")
+		plt.xlabel("t")
+		plt.ylabel("n")
+		plt.grid(True, color=[0.9, 0.9, 0.9], linewidth=1)
+
+		from matplotlib import cycler
+		cycle = cycler(color=['green', 'yellow', 'red', 'blue', 'black'])
+
+		plt.rc('lines', linewidth=1)
+		plt.rc('axes', prop_cycle=cycle)
+
+		plt.plot(
+			[i for i in range(self.time)],
+			self.healthy_accumulation,
+			[i for i in range(self.time)],
+			self.infected_accumulation,
+			[i for i in range(self.time)],
+			self.ill_accumulation,
+			[i for i in range(self.time)],
+			self.convalescent_accumulation,
+			[i for i in range(self.time)],
+			self.dead_accumulation,
+		)
 
 		plt.pause(0.05)
 
