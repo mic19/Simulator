@@ -2,6 +2,12 @@ from enum import Enum
 from math import sqrt
 
 
+def is_close(a: float, b: float, diff=0.05) -> bool:
+	if abs(a - b) < diff:
+		return True
+	return False
+
+
 class Person:
 	class State(Enum):
 		Healthy = 0
@@ -9,6 +15,12 @@ class Person:
 		Ill = 2
 		Convalescent = 3
 		Dead = 4
+
+	class MovementState(Enum):
+		Idle = 0
+		GoingTo = 1
+
+	mobile_people = []
 
 	def __init__(self, x_pos: float, y_pos: float, state=State.Healthy):
 		self.x = x_pos
@@ -18,9 +30,35 @@ class Person:
 		self.incubation_time = 0
 		self.reconvalescence_time = 0
 
+		self.movement_state = Person.MovementState.Idle
+		self.destination = None
+		self.x_step_share = 0
+		self.y_step_share = 0
+
 	def move(self, dx: float, dy: float):
 		self.x += dx
 		self.y += dy
+
+	def move_to_destination(self, dx: float, dy: float):
+		if self.movement_state is Person.MovementState.GoingTo:
+			if is_close(self.x, self.destination[0], dx) and is_close(self.y, self.destination[1], dy):
+				self.movement_state = Person.MovementState.Idle
+				Person.mobile_people.remove(self)
+			else:
+				self.move(self.x_step_share * (dx + dy), self.y_step_share * (dx + dy))
+
+	def set_destination(self, x: float, y: float):
+		if self.movement_state is Person.MovementState.Idle:
+			self.movement_state = Person.MovementState.GoingTo
+			self.destination = (x, y)
+			self.mobile_people.append(self)
+
+			a = self.destination[0] - self.x
+			b = self.destination[1] - self.y
+			r = sqrt(a ** 2 + b ** 2)
+
+			self.x_step_share = a / r
+			self.y_step_share = b / r
 
 	def expose(self, dt: float):
 		self.expose_time += dt
