@@ -1,35 +1,61 @@
 import numpy as np
-from person import Person
-from view_strategy import *
+from view.view_strategy import *
+import random
+import math
 
 
-if __name__ == "__main__":
-	population = 100
-	x_dim = 2
-	y_dim = 1
+def get_incubation_time(incubation_mean: float) -> float:
+	return np.random.normal(incubation_mean, 30)
+
+
+def get_recovery_time(recovery_mean: float) -> float:
+	return np.random.normal(recovery_mean, 120)
+
+
+def get_direction() -> [float, float]:
+	angle = np.random.rand(1) * 2 * math.pi
+	x = abs(math.sin(angle))
+	y = abs(math.cos(angle))
+
+	angle = angle/math.pi * 180
+	if 90 <= angle < 180:
+		y = -y
+	elif 180 <= angle < 270:
+		x, y = -x, -y
+	elif 270 <= angle:
+		x = -x
+
+	return x, y
+
+
+def main():
+	population = 150
+	x_dim = 2  # km
+	y_dim = 2  # km
 	dx = 0.005
-	MR = 0.1  # Ratio of mobile people
+	MR = 0.3  # Ratio of mobile people
 	DR = 0.03  # Death ration
 	dt = 1
-	sim_time = 100
-	incubation_time = 120  # Incubation mean time
-	recovery_time = 500
+	sim_time = 700
+	incubation_time = 140  # Incubation mean time
+	recovery_time = 400
 	infection_time = 3  # Time required for infection
-
-	infection_distance = 0.05
+	hospital_capacity = population * 0.2
+	infection_distance = 0.1
+	wandering_distance = 0.5
+	quarantine_ratio = 0.9
+	quarantine_flag = False
+	isolation_distance = 0.2
 
 	Px = np.random.rand(population) * x_dim - x_dim / 2
 	Py = np.random.rand(population) * y_dim - y_dim / 2
 	Ps = np.zeros(population, dtype=int)
-	Pss = np.zeros(population, dtype=int)
-	Pa = np.zeros(population, dtype=int)
 	Ps[0] = 1
-	stat = []
 
 	nt = 0
 
 	people = [Person(Px[i], Py[i]) for i in range(population)]
-	people[0].state = Person.State.Infected
+	people[0].infect(get_incubation_time(incubation_time), get_recovery_time(recovery_time))
 	view_strategy = GraphStrategy(x_dim, y_dim)
 	view_strategy.update(people)
 	view_strategy.start()
@@ -49,40 +75,43 @@ if __name__ == "__main__":
 						people[i].expose(dt)
 
 		# Moving
-		for i in range(population):
-			ratio = len(Person.mobile_people) / len(people)
-			if ratio < MR and people[i].state is not Person.State.Ill:
-				x = np.random.rand(1) * x_dim - x_dim / 2
-				y = np.random.rand(1) * y_dim - y_dim / 2
+		ratio = len(Person.mobile_people) / len(people)
+		if ratio < MR:
+			num_to_select = MR * len(people) - len(Person.mobile_people)
+			selected = random.choices(Person.idle_people, k=int(num_to_select))
 
-				if people[i].movement_state is Person.MovementState.Idle:
-					people[i].set_destination(x, y)
+			for person in selected:
+				distance = np.random.rand(1) * wandering_distance
+				direction = get_direction()
+				vector = direction * distance
+				destination = person.get_destination() + vector
 
-			if people[i].movement_state is Person.MovementState.GoingTo and people[i].state is not Person.State.Ill:
-				people[i].move_to_destination(dx, dx)
+				person.set_destination(destination[0], destination[1])
+
+		for person in Person.mobile_people:
+			person.move_to_destination(dx, dx)
 
 		# Changing state
-		for i in range(population):
-			if people[i].get_expose_time() >= infection_time:
-				people[i].infect()
+		for person in Person.healthy_people:
+			if person.get_expose_time() >= infection_time:
+				person.infect(get_incubation_time(incubation_time), get_recovery_time(recovery_time))
 
-			if people[i].get_incubation_time() >= incubation_time:
-				people[i].ill()
+		for person in Person.infected_people:
+			person.increase_incubation(dt)
 
-			if people[i].state is Person.State.Ill:
-				if people[i].get_recon_time() >= recovery_time:
-					if np.random.random(1) > DR:
-						people[i].cure()
-					else:
-						people[i].kill()
-
-			if people[i].state is Person.State.Infected:
-				people[i].increase_incubation(dt)
-
-			if people[i].state is Person.State.Ill:
-				people[i].reconvalesce(dt)
+		for person in Person.ill_people:
+			if person.get_recon_time() >= person.get_recovery_needed():
+				if np.random.random(1) > DR:
+					person.cure()
+				else:
+					person.kill()
+			person.reconvalesce(dt)
 
 		# Making view
 		view_strategy.update(people)
 
 	view_strategy.finish()
+
+
+if __name__ == "__main__":
+	main()

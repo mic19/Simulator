@@ -2,7 +2,8 @@ import matplotlib.pyplot as plt
 from typing import List
 from person import Person
 from abc import ABC
-from graph import Graph
+from view.graph import Graph
+from view.summary import SummaryFigure
 
 
 # Strategy Design Patter
@@ -12,43 +13,20 @@ class ViewStrategy(ABC):
 		self.y_dim = y_dim
 		self.time = 0
 
-		self.healthy = []
-		self.infected = []
-		self.ill = []
-		self.convalescent = []
-		self.dead = []
-
 		self.healthy_accumulation = []
 		self.infected_accumulation = []
 		self.ill_accumulation = []
 		self.convalescent_accumulation = []
 		self.dead_accumulation = []
+		self.people = None
 
 	def update(self, people: List[Person]):
-		# TODO
-		self.healthy = []
-		self.infected = []
-		self.ill = []
-		self.convalescent = []
-		self.dead = []
-
-		for person in people:
-			if person.state is Person.State.Healthy:
-				self.healthy.append(person)
-			elif person.state is Person.State.Infected:
-				self.infected.append(person)
-			elif person.state is Person.State.Ill:
-				self.ill.append(person)
-			elif person.state is Person.State.Convalescent:
-				self.convalescent.append(person)
-			elif person.state is Person.State.Dead:
-				self.dead.append(person)
-
-		self.healthy_accumulation.append(len(self.healthy))
-		self.infected_accumulation.append(len(self.infected))
-		self.ill_accumulation.append(len(self.ill))
-		self.convalescent_accumulation.append(len(self.convalescent))
-		self.dead_accumulation.append(len(self.dead))
+		self.people = people
+		self.healthy_accumulation.append(len(Person.healthy_people))
+		self.infected_accumulation.append(len(Person.infected_people))
+		self.ill_accumulation.append(len(Person.ill_people))
+		self.convalescent_accumulation.append(len(Person.convalescent_people))
+		self.dead_accumulation.append(len(Person.dead_people))
 
 	def start(self):
 		pass
@@ -72,7 +50,29 @@ class NoViewStrategy(ViewStrategy):
 		super().update(people)
 
 	def finish(self):
-		self.graph.update_distribution(self.people)
+		self.graph.update_distribution()
+		self.graph.update_share(
+			self.healthy_accumulation,
+			self.infected_accumulation,
+			self.ill_accumulation,
+			self.convalescent_accumulation,
+			self.dead_accumulation
+		)
+		plt.show()
+
+
+# Summary graph and generated gif at the end
+class GifStrategy(NoViewStrategy):
+	def __init__(self, x_dim: float, y_dim: float):
+		super().__init__(x_dim, y_dim)
+
+		self.gif_data = []
+		self.counter = 0
+
+	def update(self, people: List[Person]):
+		super().update(people)
+
+		self.graph.update_distribution()
 		self.graph.update_share(
 			self.healthy_accumulation,
 			self.infected_accumulation,
@@ -81,7 +81,20 @@ class NoViewStrategy(ViewStrategy):
 			self.dead_accumulation
 		)
 
-		self.graph.show()
+		# TODO:
+		name = 'output/test' + str(self.counter) + '.png'
+		plt.savefig(name, dpi=80)
+		self.counter += 1
+		self.gif_data.append(name)
+
+	def finish(self):
+		super().finish()
+
+		import imageio
+		images = []
+		for filename in self.gif_data:
+			images.append(imageio.imread(filename))
+		imageio.mimsave('output/a.gif', images)
 
 
 # View updating during simulation
@@ -93,7 +106,7 @@ class GraphStrategy(ViewStrategy):
 	def update(self, people: List[Person]):
 		super().update(people)
 
-		self.graph.update_distribution(people)
+		self.graph.update_distribution()
 		self.graph.update_share(
 			self.healthy_accumulation,
 			self.infected_accumulation,
@@ -106,4 +119,6 @@ class GraphStrategy(ViewStrategy):
 
 	def finish(self):
 		self.graph.show()
+		summary = SummaryFigure(self.people)
+		summary.show()
 
